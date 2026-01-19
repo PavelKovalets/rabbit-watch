@@ -3,6 +3,17 @@
 ** Pet project to use local PC with NVIDIA RTX 5090 real-time rabbit detection.**
 
 Rabbit-Watch leverages the massive parallel processing power of the **NVIDIA RTX 5090** and the reasoning capabilities of **Qwen3-VL** to provide a privacy-first, local-only monitoring solution. By decoupling video ingestion from AI inference via **Redis Streams**, the system achieves low latency and high reliability.
+ 
+## ⚡ Quick Start
+
+Start the services and run the components locally:
+
+- Start Redis (and vLLM if applicable): `docker-compose up -d`
+- Configure local environment ([use venv with VS Code](https://code.visualstudio.com/docs/python/python-tutorial), miniconda for Windows is broken and is very hard to configure properly)
+- Install dependencies within the venv: `pip install -r requirements.txt`
+- Run the producer (camera → Redis): `python -m src.producer.capture`
+- Run the brain (Redis → vLLM inference): `python -m src.brain.inference`
+
 
 ---
 

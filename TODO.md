@@ -1,5 +1,6 @@
 # rabbit-watch — TODO Plan
 
+- **Test Redis** test the local Redis server by pushing and reading sample image
 - **Webcam Capture:** Implement reliable webcam capture using OpenCV, with frame sampling and drop handling.
 - **Preprocessing Pipeline:** Resize, normalize, and batch frames; add optional ROI and low-light enhancement.
 - **Vision LLM Integration:** Wire inference to a Vision LLM (local PyTorch/ONNX/TensorRT or cloud API wrapper).
