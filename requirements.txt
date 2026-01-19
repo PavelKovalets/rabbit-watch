@@ -1,0 +1,7 @@
+opencv-python
+redis
+numpy
+pillow
+aiohttp
+python-dotenv
+requests

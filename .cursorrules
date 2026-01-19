@@ -1,0 +1,4 @@
+# Cursor rules / developer notes for Rabbit-Watch
+- Target GPU: NVIDIA RTX 5090
+- Use Redis Streams as buffer with MAXLEN=100
+- Local vLLM endpoint expected at http://vllm:8000 (see docker-compose.yml)

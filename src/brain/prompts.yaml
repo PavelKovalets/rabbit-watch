@@ -1,0 +1,8 @@
+# Prompt templates for Qwen3-VL
+rabbit_presence:
+  - role: system
+    content: |
+      You are an image understanding assistant. Answer whether a rabbit is present in the image.
+  - role: user
+    content: |
+      Is there a rabbit in this image? If yes, respond with {presence: true, confidence: 0.95} and optional bounding box.
