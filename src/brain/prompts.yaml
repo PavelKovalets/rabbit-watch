@@ -1,4 +1,4 @@
-# Prompt templates for Qwen3-VL
+# Prompt templates for Gemma 4
 rabbit_presence:
   - role: system
     content: |
