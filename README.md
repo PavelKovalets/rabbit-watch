@@ -1,18 +1,20 @@
 # 🐰 Rabbit-Watch
 
-** Pet project to use local PC with NVIDIA RTX 5090 real-time rabbit detection.**
+** Pet project: detect when my pet rabbit is on the living-room couch, log it, and measure how often it happens.**
 
-Rabbit-Watch leverages the massive parallel processing power of the **NVIDIA RTX 5090** and the reasoning capabilities of **Gemma 4** to provide a privacy-first, local-only monitoring solution. By decoupling video ingestion from AI inference via **Redis Streams**, the system achieves low latency and high reliability.
+The rabbit has a habit of jumping on the couch and pooping there. Rabbit-Watch is a privacy-first, local-only **monitoring instrument** that uses **Gemma 4** (on an **NVIDIA RTX 5090**) to spot the rabbit on the couch, log every event with a snapshot, and report how often it happens — so behavioral interventions (spaying, covering the couch) can be measured. By decoupling video ingestion from AI inference via **Redis Streams**, the system stays responsive. See [`spec/objectives.md`](spec/objectives.md) for goals and the deliberate decision *not* to build an automated deterrent.
+
+The pipeline runs inside an **Ubuntu VM on a Windows 11 Hyper-V host**: the webcam is attached into the VM via **usbipd-win**, while the GPU stays on the host and is reached over an internal vSwitch through **LM Studio**'s OpenAI-compatible API (see [`spec/infrastructure.md`](spec/infrastructure.md) for the full topology).
  
 ## ⚡ Quick Start
 
 Start the services and run the components locally:
 
-- Start Redis (and vLLM if applicable): `docker-compose up -d`
+- Start Redis: `docker-compose up -d`
 - Configure local environment ([use venv with VS Code](https://code.visualstudio.com/docs/python/python-tutorial), miniconda for Windows is broken and is very hard to configure properly)
 - Install dependencies within the venv: `pip install -r requirements.txt`
 - Run the producer (camera → Redis): `python -m src.producer.capture`
-- Run the brain (Redis → vLLM inference): `python -m src.brain.inference`
+- Run the brain (Redis → LM Studio inference): `python -m src.brain.inference`
 
 
 ---
@@ -21,10 +23,12 @@ Start the services and run the components locally:
 
 The system follows a **Producer-Consumer** pattern mediated by an in-memory message bus. This allows the GPU to process frames at its own pace while the camera captures at full speed.
 
-1.  **Producer (The Eyes):** A lightweight Python process that captures raw frames from the USB webcam, performs JPEG compression to save system RAM, and pushes to a Redis Stream.
-2.  **Redis Stream (The Buffer):** Resides in your **50GB System RAM**. It acts as a circular buffer (`MAXLEN 100`), ensuring the "Brain" always has access to the most recent frames without disk I/O.
-3.  **The Brain (The Logic):** An asynchronous consumer running on the **RTX 5090**. It pulls frames, sends them to a local **vLLM** endpoint, and interprets the scene using Gemma 4.
-4.  **The Notifier (The Voice):** A separate module that listens for "Detection" events and triggers mobile alerts via **ntfy.sh** or **Pushover**.
+1.  **Producer (The Eyes):** captures webcam frames (attached into the VM via `usbipd attach`), JPEG-compresses them, and pushes to a Redis Stream.
+2.  **Redis Stream (The Buffer):** a bounded in-RAM circular buffer — the "Brain" always sees the most recent frames, with no disk I/O.
+3.  **The Brain (The Logic):** an async consumer that sends frames across the Hyper-V vSwitch to **LM Studio** on the Windows host (CUDA on the **RTX 5090**), where **Gemma 4** judges whether the rabbit is on the couch. Confirmed events are written to an event log with a snapshot. The VM never touches the GPU directly.
+4.  **The Notifier (The Voice):** ntfy.sh mobile alerts — *deferred*; the MVP is log-only (see `spec/`).
+
+Full design docs live in [`spec/`](spec/): [objectives](spec/objectives.md) · [requirements](spec/requirements.md) · [architecture](spec/architecture.md) · [tasks](spec/tasks.md) · [decisions](spec/decisions.md).
 
 ---
 
@@ -32,9 +36,10 @@ The system follows a **Producer-Consumer** pattern mediated by an in-memory mess
 
 ```text
 rabbit-watch/
-├── .cursorrules           # AI Agent instructions (RTX 5090 & Redis context)
-├── docker-compose.yml     # Orchestrates Redis and vLLM (CUDA 12.8 optimized)
-├── requirements.txt       # Dependencies: opencv-python, redis, vllm-client
+├── CLAUDE.md              # AI agent instructions (SDD workflow & conventions)
+├── spec/                  # Source of truth: objectives, requirements, architecture, infrastructure, tasks, decisions
+├── docker-compose.yml     # Orchestrates Redis (inference lives on the host, not in Docker)
+├── requirements.txt       # Dependencies: opencv-python, redis, requests
 │
 ├── src/
 │   ├── common/            # Shared logic & Config loaders
@@ -44,7 +49,7 @@ rabbit-watch/
 │   ├── producer/          # INGESTION: Camera -> Redis
 │   │   └── capture.py     # OpenCV + JPEG compression loop
 │   │
-│   ├── brain/             # INFERENCE: Redis -> vLLM (GPU)
+│   ├── brain/             # INFERENCE: Redis -> LM Studio (host GPU)
 │   │   ├── inference.py   # Main logic loop for Gemma 4
 │   │   └── prompts.yaml   # Vision LLM prompt templates
 │   │

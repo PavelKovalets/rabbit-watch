@@ -8,21 +8,9 @@ services:
     volumes:
       - redis-data:/data
 
-  # vllm:
-  #   image: ghcr.io/vllm/vllm:latest
-  #   deploy:
-  #     resources:
-  #       reservations:
-  #         devices:
-  #           - driver: nvidia
-  #             count: 1
-  #             capabilities: [gpu]
-  #   environment:
-  #     - NVIDIA_VISIBLE_DEVICES=all
-  #   ports:
-  #     - "8000:8000"
-  #   # Note: This image and runtime assume Docker + NVIDIA Container Toolkit is installed.
-  #   # Adjust image/command as needed for your vLLM/local endpoint.
+  # Inference is NOT containerized: the brain calls LM Studio on the Hyper-V
+  # host (OpenAI-compatible API over the internal vSwitch).
+  # See spec/infrastructure.md for the topology.
 
 volumes:
   redis-data: {}
