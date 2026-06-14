@@ -12,15 +12,23 @@ speed while inference consumes at its own pace:
    from env vars (see below).
 3. **Brain** (`src/brain/inference.py`) — async `XREAD` consumer (blocks 5s, batches
    of 10). Per frame it runs the detection chain: `vision.py` asks Gemma 4 (via
-   LM Studio) whether the rabbit is on the couch; `detector.py` applies the confidence
-   threshold + consecutive-frame smoothing (`Confirmer`) and per-visit cooldown
-   (`Cooldown`); confirmed events go to the event log. The blocking HTTP call runs off
-   the event loop via `asyncio.to_thread`. Prompts live in `src/brain/prompts.yaml`.
-4. **Event log** (`src/brain/events.py`) — confirmed events are appended as JSON Lines
-   (timestamp, confidence, snapshot reference) at `RABBITWATCH_EVENTS_LOG`, with the
-   snapshot JPEG under `RABBITWATCH_OUTPUT_DIR`. This is the MVP's output. Phase 2
-   analytics will read this log alone (incidents/day, time-of-day, trend) to measure
-   intervention efficacy.
+   LM Studio) whether the rabbit is on the couch and for a brief scene description;
+   `detector.py` applies the confidence threshold + consecutive-frame smoothing
+   (`Confirmer`). Phase 1 de-dups repeats with a cooldown (`Cooldown`); **Phase 2
+   replaces that with arrival/departure visit tracking** (open on confirmation, close
+   after a sustained absence) so a visit's duration can be measured. The blocking HTTP
+   call runs off the event loop via `asyncio.to_thread`. Prompts live in
+   `src/brain/prompts.yaml`.
+4. **Event log** (`src/brain/events.py`) — one JSON-Lines record per visit at
+   `RABBITWATCH_EVENTS_LOG`, with the snapshot JPEG under `RABBITWATCH_OUTPUT_DIR`.
+   Phase 1 fields: `{timestamp, confidence, on_couch, snapshot}`. **Phase 2 enriches**
+   each record with `start`/`end`/`duration_s` (dwell), a `scene` description, and the
+   raw model `response`. A separate **raw-response audit log** (`RABBITWATCH_RESPONSES_LOG`,
+   JSON-Lines) records *every* model classification regardless of confirmation (FR-9).
+5. **Analytics** (`src/brain/analytics.py`, Phase 2) — reads the event log alone and
+   writes a descriptive Excel **`.xlsx`** workbook over the full history (via `openpyxl`):
+   a visits sheet (raw data), per-day counts, time-of-day distribution (local timezone),
+   and dwell-time stats. Descriptive only — no before/after efficacy claims.
 5. **Notifier** (`src/notifier/alert.py`) — `send_ntfy()` posts to ntfy.sh with optional
    image attachment. **Deferred (P3):** present but unused; the MVP is log-only.
 
@@ -62,10 +70,11 @@ network addressing, and assumed host state are documented in
 | `RABBITWATCH_VLM_MODEL` | `gemma-4` | brain (name as loaded in LM Studio) |
 | `RABBITWATCH_VLM_API_KEY` | _(unset)_ | brain (Bearer token; from env/.env, NFR-6) |
 | `RABBITWATCH_VLM_TIMEOUT` | `30` | brain (seconds) |
-| `RABBITWATCH_CONF_THRESHOLD` | `0.8` | brain |
-| `RABBITWATCH_CONSECUTIVE_FRAMES` | `3` | brain |
-| `RABBITWATCH_COOLDOWN_SECONDS` | `300` | brain |
-| `RABBITWATCH_EVENTS_LOG` | `<RABBITWATCH_OUTPUT_DIR>/events.jsonl` | brain |
+| `RABBITWATCH_CONF_THRESHOLD` | `0.8` | brain (confidence to count a frame present) |
+| `RABBITWATCH_CONSECUTIVE_FRAMES` | `3` | brain (present frames to open a visit) |
+| `RABBITWATCH_ABSENCE_FRAMES` | `3` | brain (absent frames to close a visit) |
+| `RABBITWATCH_EVENTS_LOG` | `<RABBITWATCH_OUTPUT_DIR>/events.jsonl` | brain (per-visit log) |
+| `RABBITWATCH_RESPONSES_LOG` | `<RABBITWATCH_OUTPUT_DIR>/responses.jsonl` | brain (raw-response audit log) |
 | `RABBITWATCH_NTFY_TOPIC` | `rabbit-watch` | notifier (deferred, P3) |
 
 Every variable must have a working default (NFR-3 in

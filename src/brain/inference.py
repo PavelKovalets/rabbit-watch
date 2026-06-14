@@ -6,8 +6,8 @@ from dotenv import load_dotenv
 # Load .env (e.g. RABBITWATCH_VLM_API_KEY) before the brain modules read their config.
 load_dotenv()
 
-from src.brain.detector import Confirmer, Cooldown, RabbitCouchDetector
-from src.brain.events import EventLog
+from src.brain.detector import RabbitCouchDetector, VisitTracker
+from src.brain.events import EventLog, ResponseLog
 from src.brain.vision import VisionClient
 from src.common.logger import get_logger
 from src.common.redis_client import get_redis_client
@@ -19,9 +19,9 @@ STREAM_KEY = os.getenv("RABBITWATCH_STREAM", "rabbit-watch-frames")
 def build_detector() -> RabbitCouchDetector:
     return RabbitCouchDetector(
         vision=VisionClient(),
-        confirmer=Confirmer(),
-        cooldown=Cooldown(),
+        tracker=VisitTracker(),
         event_log=EventLog(),
+        response_log=ResponseLog(),
     )
 
 

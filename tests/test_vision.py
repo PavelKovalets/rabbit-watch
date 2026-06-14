@@ -51,9 +51,19 @@ def test_no_auth_header_when_no_key(jpeg_bytes):
     assert "Authorization" not in post.headers
 
 
+def test_parse_extracts_scene():
+    v = parse_verdict('{"on_couch": true, "confidence": 0.9, "scene": "a rabbit on a couch"}')
+    assert v.scene == "a rabbit on a couch"
+    assert v.raw  # raw response retained for the audit log
+
+
+def test_parse_missing_scene_is_empty():
+    assert parse_verdict('{"on_couch": false, "confidence": 0.2}').scene == ""
+
+
 def test_prompt_yaml_has_couch_template():
-    # T1.3: the shipped prompt asks about the couch and a structured reply.
+    # T2.2: the shipped prompt asks about the couch and a structured reply incl. scene.
     prompt = load_prompt("rabbit_on_couch")
     text = " ".join(turn["content"] for turn in prompt).lower()
     assert "couch" in text
-    assert "on_couch" in text and "confidence" in text
+    assert "on_couch" in text and "confidence" in text and "scene" in text

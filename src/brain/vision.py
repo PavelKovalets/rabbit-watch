@@ -11,7 +11,7 @@ import base64
 import json
 import os
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import requests
@@ -29,15 +29,21 @@ DEFAULT_API_KEY = os.getenv("RABBITWATCH_VLM_API_KEY")  # None disables the auth
 
 @dataclass(frozen=True)
 class Verdict:
-    """One frame's judgement: is the rabbit on the couch, and how sure."""
+    """One frame's judgement: on the couch?, how sure, a scene description, raw response.
+
+    `raw` (the model's full response text) is excluded from equality/repr — it's payload
+    for the audit log, not part of the logical verdict.
+    """
 
     on_couch: bool
     confidence: float
+    scene: str = ""
+    raw: str = field(default="", compare=False, repr=False)
 
     @classmethod
-    def negative(cls) -> "Verdict":
+    def negative(cls, raw: str = "") -> "Verdict":
         """The safe default used whenever a frame can't be judged (NFR-2)."""
-        return cls(on_couch=False, confidence=0.0)
+        return cls(on_couch=False, confidence=0.0, scene="", raw=raw)
 
 
 def load_prompt(name: str = "rabbit_on_couch", path: Path = PROMPTS_PATH) -> list[dict]:
@@ -60,7 +66,13 @@ def parse_verdict(content: str) -> Verdict:
     on_couch = data.get("on_couch")
     if on_couch is None:  # tolerate a couple of alternate spellings
         on_couch = data.get("present", data.get("presence", False))
-    return Verdict(on_couch=bool(on_couch), confidence=float(data.get("confidence", 0.0)))
+    scene = str(data.get("scene") or data.get("description") or "")
+    return Verdict(
+        on_couch=bool(on_couch),
+        confidence=float(data.get("confidence", 0.0)),
+        scene=scene,
+        raw=content,
+    )
 
 
 class VisionClient:
@@ -115,4 +127,4 @@ class VisionClient:
             return parse_verdict(content)
         except Exception:
             logger.warning("Unparseable verdict, treating as not-on-couch: %r", content)
-            return Verdict.negative()
+            return Verdict.negative(raw=content)  # keep the unparseable text for the audit log

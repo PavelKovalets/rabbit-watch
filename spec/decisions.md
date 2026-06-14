@@ -5,6 +5,25 @@ decided, why, and what was rejected. Add an entry whenever a choice shapes the
 architecture, the toolchain, or the workflow — especially when reversing one of these
 means real rework.
 
+## 2026-06-13 — Phase 2 scope: richer events, dwell tracking, descriptive-only analytics
+
+**Decision**: Phase 2 (1) captures more per visit — a brief **scene description** and the
+**raw model response** on each record — plus a **full audit log of every raw model
+response** (FR-9); (2) measures **dwell time** by tracking a visit from arrival to
+departure, which **replaces the Phase 1 cooldown** (a `VisitTracker` supersedes
+`Cooldown`; `RABBITWATCH_ABSENCE_FRAMES` replaces `RABBITWATCH_COOLDOWN_SECONDS`); and
+(3) ships **descriptive analytics only** — visits/day, time-of-day (system local tz),
+dwell stats — as an Excel **`.xlsx`** workbook generated over the full history.
+
+**Why**: The owner wants to understand the behavior (how often, when, how long) and have
+the model's own description of each scene for review. Dwell time needs explicit
+visit-end detection, so the cooldown de-dup is subsumed by proper visit boundaries.
+
+**Rejected**: before/after intervention efficacy comparison (dropped — descriptive stats
+are enough; proving spay/couch-cover effect is out of scope); terminal/CSV/PNG output
+(chose `.xlsx` — one shareable file that opens in Excel); configurable timezone (use the
+system local zone).
+
 ## 2026-06-12 — Capture + Redis on the host; only the brain runs in the guest
 
 **Decision**: The webcam stays on the host, and the **producer + Redis run on the host**
@@ -47,6 +66,8 @@ Gemma 4 is asked directly whether the rabbit is on the couch (no ROI geometry). 
 **analytics** (incidents/day, time-of-day, trend) is an explicit goal so the owner can
 baseline now and measure whether spaying + covering the couch reduce the behavior.
 Real-time alerting and any automated response are deferred (P3/P4).
+*(Superseded 2026-06-13: the efficacy / before-after measurement was dropped; analytics
+are descriptive only — see the 2026-06-13 entry above.)*
 
 **Why**: Rabbits are prey animals — startle-based aversives (water/flash/sound) cause
 fear and GI-stasis risk, not learning, and can damage the human bond. The behaviorally

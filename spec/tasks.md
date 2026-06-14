@@ -18,10 +18,13 @@ Status legend for sub-systems: ✅ done · 🟡 partial/stub · ❌ not started.
 durable event record with snapshot. Output is the event log; no alerts, no actuators.
 
 Current state: producer ✅; vision client ✅ (`src/brain/vision.py`); prompts.yaml ✅
-(couch-specific, structured reply); confirmation + cooldown ✅ (`src/brain/detector.py`);
+(couch-specific, structured reply); detection + visit tracking ✅ (`src/brain/detector.py`);
 event log ✅ (`src/brain/events.py`); brain loop ✅ (wired, save-every-frame stub
-replaced); LM Studio Bearer-token auth ✅ (`RABBITWATCH_VLM_API_KEY`, NFR-6). Automated
-tests ✅ (26 passing); real-endpoint smoke test ⏳ (T1.14).
+replaced); LM Studio Bearer-token auth ✅ (`RABBITWATCH_VLM_API_KEY`, NFR-6).
+real-endpoint smoke test ⏳ (T1.14).
+
+> Note: Phase 2 replaced the Phase 1 `Confirmer`/`Cooldown` (and `test_confirmer.py`/
+> `test_cooldown.py`) with `VisitTracker` — the T1.5–T1.8 records below are historical.
 
 Test env: `conda env create -f environment.yml` → run with
 `~/miniconda3/envs/rabbit-watch/bin/python -m pytest`.
@@ -95,16 +98,56 @@ Test env: `conda env create -f environment.yml` → run with
 
 ---
 
-## Phase 2 — Analytics / efficacy measurement (FR-6)
+## Phase 2 — Richer events + descriptive analytics (FR-2, FR-5, FR-6, FR-9)
 
-Outline; expand into tasks when Phase 1 lands.
+Goal: capture more per visit (scene description, raw model response, dwell time), keep a
+full raw-response audit log, and produce a descriptive analytics workbook. Analytics are
+descriptive only — no before/after efficacy comparison (dropped, see decisions.md).
+Output: an Excel `.xlsx` workbook over the full history; time-of-day in the system local
+timezone. Same SDD order — tests before implementation.
 
-- [ ] Define the report: incidents per day, time-of-day histogram, rolling trend.
-- [ ] Tests over a synthetic event log (fixed records → expected aggregates).
-- [ ] Implement a reporter that reads only the persisted event log (no in-memory state)
-  and emits the metrics (CLI/printed summary to start).
-- [ ] Capture a pre-intervention baseline; re-run after spaying and after the couch
-  cover to compare.
+Status: **all tasks done; 34 tests passing.** Verified live — the model returns scene
+descriptions through the new prompt, and `analytics` generates an `.xlsx` over the visit
+log.
+
+### A. Scene description, raw response, audit log (FR-2, FR-5, FR-9)
+
+- [x] **T2.1** Tests: `parse_verdict` extracts a `scene` string alongside `on_couch` /
+  `confidence`; missing `scene` degrades gracefully (empty string), never raises.
+- [x] **T2.2** Update `prompts.yaml` to ask for a brief one-line scene description in the
+  JSON reply (`{on_couch, confidence, scene}`).
+- [x] **T2.3** Add `scene` to `Verdict` and keep the raw response text; thread both
+  through `VisionClient.classify`.
+- [x] **T2.4** Tests + impl: append every classification (timestamp, on_couch,
+  confidence, scene, raw response) to a raw-response audit log
+  (`RABBITWATCH_RESPONSES_LOG`, default `<OUTPUT_DIR>/responses.jsonl`), regardless of
+  confirmation (FR-9).
+- [x] **T2.5** Extend the per-visit event record (and tests) with `scene` and raw
+  `response`.
+
+### B. Visit dwell tracking — replace cooldown (FR-3, FR-4, FR-5)
+
+- [x] **T2.6** Tests: a visit opens when presence is confirmed and closes after
+  `RABBITWATCH_ABSENCE_FRAMES` (default 3) consecutive non-detections; the closed visit
+  carries `start`, `end`, `duration_s`; a continuous stay yields exactly one record;
+  flapping within the absence window does not split it. Injectable clock, no sleeps.
+- [x] **T2.7** Implement a `VisitTracker` (replaces `Cooldown`): holds the open visit,
+  closes it on sustained absence, emits one enriched record per visit. Retire
+  `RABBITWATCH_COOLDOWN_SECONDS`; add `RABBITWATCH_ABSENCE_FRAMES`. Update the env table
+  in [architecture.md](architecture.md).
+- [x] **T2.8** Rewire `RabbitCouchDetector` / brain loop to the visit model; update the
+  integration test for start/end/duration.
+
+### C. Analytics workbook (FR-6)
+
+- [x] **T2.9** Tests over a synthetic event log (fixed records → expected aggregates):
+  visits per day, hour-of-day histogram (local tz), dwell-time stats (count, mean,
+  median, max). Pure functions over parsed records, no I/O.
+- [x] **T2.10** Implement `src/brain/analytics.py`
+  (`python -m src.brain.analytics [-o FILE]`): read the event log alone (FR-6
+  reproducibility) and write an `.xlsx` workbook via `openpyxl` — sheets for raw visits,
+  per-day counts, time-of-day, and a summary (dwell stats). Add `openpyxl` to
+  `requirements.txt` / `environment.yml`. No DB, no external services.
 
 ---
 

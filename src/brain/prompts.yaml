@@ -7,5 +7,6 @@ rabbit_on_couch:
   - role: user
     content: |
       Is the rabbit on the couch in this image?
-      Respond with a single JSON object: {"on_couch": <true|false>, "confidence": <0.0-1.0>}.
-      confidence is how sure you are of the on_couch value.
+      Respond with a single JSON object:
+      {"on_couch": <true|false>, "confidence": <0.0-1.0>, "scene": "<one short sentence describing what you see>"}.
+      confidence is how sure you are of the on_couch value; scene is a brief description of the scene.

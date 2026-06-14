@@ -6,4 +6,5 @@ aiohttp
 python-dotenv
 requests
 pyyaml
+openpyxl
 pytest
