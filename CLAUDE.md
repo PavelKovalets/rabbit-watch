@@ -34,6 +34,7 @@ conda env create -f environment.yml       # Create the `rabbit-watch` env (deps 
 conda activate rabbit-watch               # ...then `pip install -r requirements.txt` to refresh after dep changes
 python -m src.producer.capture            # Run producer: webcam -> Redis Stream
 python -m src.brain.inference             # Run brain: Redis Stream -> detect rabbit-on-couch -> event log
+python -m src.tools.peek_frames -n 10     # Dump recent stream frames to data/preview (read-only debug)
 pytest                                    # Run the test suite (tests/, offline — no camera/Redis/LM Studio needed)
 ```
 

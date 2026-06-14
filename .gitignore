@@ -208,3 +208,6 @@ __marimo__/
 
 # Conda installer (downloaded locally, not part of the project)
 Miniconda3-*.sh
+
+# Runtime artifacts: captured frames, detection snapshots, event log, previews
+data/
