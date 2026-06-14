@@ -5,6 +5,39 @@ decided, why, and what was rejected. Add an entry whenever a choice shapes the
 architecture, the toolchain, or the workflow — especially when reversing one of these
 means real rework.
 
+## 2026-06-12 — Capture + Redis on the host; only the brain runs in the guest
+
+**Decision**: The webcam stays on the host, and the **producer + Redis run on the host**
+too. The guest runs only the brain, which connects *out* to the host for both Redis
+(`172.27.144.1:6379`) and the model (`172.27.144.1:1234`). Frames flow
+host-producer → host-Redis → guest-brain.
+
+**Why**: The pipeline is already decoupled by Redis, so capture needn't live in the
+guest. The guest is a cloud-flavoured Ubuntu (`*-azure` kernel) with no `vhci-hcd`
+module and no Docker installed — USB/IP passthrough and an in-guest Redis are both extra
+setup for no benefit. Running capture where the camera already works is simpler and
+keeps the guest's inbound surface at zero (it only makes outbound calls).
+
+**Rejected**: USB/IP webcam passthrough into the guest (needs a `vhci-hcd` kernel module
+the azure kernel lacks, host `usbipd-win`, port 3240, and per-session re-attach);
+in-guest Redis (Docker isn't installed in the guest).
+
+## 2026-06-12 — Keep LM Studio API auth on; token via env
+
+**Decision**: LM Studio's server requires a Bearer API token, and we keep it that way.
+The brain sends `Authorization: Bearer <token>` read from `RABBITWATCH_VLM_API_KEY`
+(env or a gitignored `.env`); the token is never committed.
+
+**Why**: The guest currently runs on the Hyper-V Default Switch (NAT, has internet
+egress), which is a looser boundary than the originally-planned isolated internal
+vSwitch. With egress present, leaving the model endpoint unauthenticated is needless
+exposure; an env-supplied token costs almost nothing.
+
+**Rejected**: disabling LM Studio auth (the "plain HTTP on a private network" assumption
+in infrastructure.md) — fine only under true network isolation, which is not the current
+state. Connection confirmed: host reachable at the Default Switch gateway
+`172.27.144.1:1234`.
+
 ## 2026-06-12 — Scope pivot: measurement instrument, not automated trainer
 
 **Decision**: Reframe the project from "detect the rabbit on the couch and automatically

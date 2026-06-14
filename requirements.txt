@@ -5,3 +5,5 @@ pillow
 aiohttp
 python-dotenv
 requests
+pyyaml
+pytest

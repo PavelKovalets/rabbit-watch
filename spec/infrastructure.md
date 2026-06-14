@@ -24,40 +24,52 @@ in the design should require host access or weaken the VM boundary.
 ┌─────────────────── Windows 11 Pro Host ─────────────────────┐
 │                                                              │
 │   LM Studio (Windows-native)  ◄──── RTX 5090 (CUDA)          │
-│   Listens on 0.0.0.0:1234 (OpenAI-compatible /v1)            │
+│   Listens on 0.0.0.0:1234 (OpenAI-compatible /v1, token auth)│
 │                                                              │
-│   ┌─── Hyper-V Internal vSwitch (e.g. 192.168.50.0/24) ────┐ │
-│   │ Host: 192.168.50.1                                      │ │
+│   ┌─── Hyper-V Default Switch (NAT, 172.27.144.0/20) ──────┐ │
+│   │ Host/gateway: 172.27.144.1                              │ │
 │   │                                                         │ │
 │   │   ┌── Ubuntu agent VM ──┐                               │ │
-│   │   │ 192.168.50.10        │  brain → http://             │ │
-│   │   │                      │    192.168.50.1:1234/v1      │ │
+│   │   │ 172.27.145.x         │  brain → http://             │ │
+│   │   │                      │    172.27.144.1:1234/v1      │ │
 │   │   └──────────────────────┘                              │ │
 │   └─────────────────────────────────────────────────────────┘ │
 └──────────────────────────────────────────────────────────────┘
 ```
 
+Current setup uses the **Hyper-V Default Switch**, not a hand-rolled internal vSwitch.
+Confirmed reachable: the host is the guest's default gateway (`172.27.144.1`) and LM
+Studio answers on `:1234`. Note the Default Switch picks its 172.x subnet at host boot
+and can change across reboots, so the brain resolves the host from the gateway rather
+than a hardcoded IP (`ip route | awk '/default/{print $3}'`).
+
 - **GPU access** is HTTP-only: the brain calls LM Studio's OpenAI-compatible API at the
-  host's vSwitch IP (`192.168.50.1:1234`). The VM never touches CUDA. Ollama is an
-  acceptable swap-in for LM Studio.
-- **Egress**: the internal vSwitch has no external egress by default. Anything that must
-  reach the internet (e.g. ntfy.sh in a later phase) needs a per-VM egress rule.
-- **Webcam**: a host USB webcam is attached into a chosen VM on demand with `usbipd-win`
-  (`usbipd attach`); verify in-guest with `v4l2-ctl`.
+  host gateway (`172.27.144.1:1234`), authenticated with a Bearer token (see
+  [decisions.md](decisions.md)). The VM never touches CUDA. Ollama is an acceptable
+  swap-in for LM Studio.
+- **Egress**: the Default Switch provides NAT, so the guest currently *has* internet
+  egress (handy for ntfy.sh in P3). This is looser than the "isolated, no-egress internal
+  vSwitch" goal in [decisions.md](decisions.md) — reconcile if stricter isolation is
+  wanted (open item below).
+- **Webcam**: stays on the host. Capture runs on the host (the producer) and pushes
+  frames to host Redis; the guest never sees the USB device. (USB/IP into the guest was
+  considered and rejected — see [decisions.md](decisions.md).)
 
 ## Assumed host state
 
 For the pipeline to run, the host must provide:
 
 - LM Studio bound to `0.0.0.0:1234` (not just localhost) with a vision-capable Gemma 4
-  variant loaded — see [decisions.md](decisions.md) for the model choice.
-- The internal vSwitch up, with a firewall rule allowing guests → `host:1234`.
-- The webcam attached to the target VM via `usbipd-win`.
+  variant loaded — see [decisions.md](decisions.md) for the model choice — and **API
+  token auth enabled**; the token is given to the brain via env/.env (never committed).
+- Windows Firewall inbound rules allowing the guest subnet → `host:1234` (model;
+  confirmed open) and → `host:6379` (Redis).
+- The webcam connected to the host, plus the producer and Redis running on the host.
 
 ## Open environment questions
 
-- **Webcam vendor/PID** for the `usbipd` bind rule — currently unknown.
-- **LM Studio authentication** — plain HTTP on the private vSwitch is fine for solo use;
-  revisit if multiple humans or untrusted agents share the host.
+- **Network isolation** — currently the Default Switch (NAT, has egress). If the
+  "isolated internal vSwitch, no egress" posture from [decisions.md](decisions.md) is
+  required, switch the guest's network and add egress rules only where needed.
 - **Camera attach ergonomics** — manual `usbipd attach` per session to start; static
   attach at VM boot is a possible later convenience.

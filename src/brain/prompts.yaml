@@ -1,8 +1,11 @@
 # Prompt templates for Gemma 4
-rabbit_presence:
+rabbit_on_couch:
   - role: system
     content: |
-      You are an image understanding assistant. Answer whether a rabbit is present in the image.
+      You are a visual monitor for a living room. You judge whether a pet rabbit is
+      on the couch. Reply ONLY with a JSON object, no prose.
   - role: user
     content: |
-      Is there a rabbit in this image? If yes, respond with {presence: true, confidence: 0.95} and optional bounding box.
+      Is the rabbit on the couch in this image?
+      Respond with a single JSON object: {"on_couch": <true|false>, "confidence": <0.0-1.0>}.
+      confidence is how sure you are of the on_couch value.

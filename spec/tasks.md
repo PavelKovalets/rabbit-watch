@@ -17,67 +17,81 @@ Status legend for sub-systems: ✅ done · 🟡 partial/stub · ❌ not started.
 **Goal**: rabbit-on-couch detection → confirmation (threshold + smoothing + cooldown) →
 durable event record with snapshot. Output is the event log; no alerts, no actuators.
 
-Current state: producer ✅; brain 🟡 (saves every frame, no inference); prompts.yaml 🟡
-(asks generic "is there a rabbit", not couch-specific); event log ❌.
+Current state: producer ✅; vision client ✅ (`src/brain/vision.py`); prompts.yaml ✅
+(couch-specific, structured reply); confirmation + cooldown ✅ (`src/brain/detector.py`);
+event log ✅ (`src/brain/events.py`); brain loop ✅ (wired, save-every-frame stub
+replaced); LM Studio Bearer-token auth ✅ (`RABBITWATCH_VLM_API_KEY`, NFR-6). Automated
+tests ✅ (26 passing); real-endpoint smoke test ⏳ (T1.14).
+
+Test env: `conda env create -f environment.yml` → run with
+`~/miniconda3/envs/rabbit-watch/bin/python -m pytest`.
 
 ### 1. Test scaffolding (NFR-5)
 
-- [ ] **T1.1** Add `pytest` to `requirements.txt`; create `tests/` with shared fixtures:
+- [x] **T1.1** Add `pytest` to `requirements.txt`; create `tests/` with shared fixtures:
   a fake frame stream (yields a scripted sequence of JPEG bytes) and a fake vision
   client (returns scripted verdicts, raises on demand). No real Redis/camera/LM Studio.
 
-### 2. Vision client — "is the rabbit on the couch?" (FR-2, FR-7 / NFR-2)
+### 2. Vision client — "is the rabbit on the couch?" (FR-2 / NFR-2)
 
-- [ ] **T1.2** Tests: given a well-formed model response, parse a `Verdict(on_couch:
+- [x] **T1.2** Tests: given a well-formed model response, parse a `Verdict(on_couch:
   bool, confidence: float)`; given malformed JSON, timeout, or connection error, return
-  a "not on couch" verdict and log — never raise.
-- [ ] **T1.3** Update `src/brain/prompts.yaml`: replace `rabbit_presence` with a
+  a "not on couch" verdict and log — never raise. (`tests/test_vision.py`)
+- [x] **T1.3** Update `src/brain/prompts.yaml`: replace `rabbit_presence` with a
   `rabbit_on_couch` template that asks specifically whether the rabbit is **on the
   couch** and requests a structured `{on_couch, confidence}` reply.
-- [ ] **T1.4** Implement `src/brain/vision.py`: call the OpenAI-compatible chat
+- [x] **T1.4** Implement `src/brain/vision.py`: call the OpenAI-compatible chat
   completions endpoint with the frame image + prompt, parse the structured verdict.
   Config: `RABBITWATCH_VLM_URL` (default `http://localhost:1234/v1`), `RABBITWATCH_VLM_MODEL`.
   Wrap network/parse errors per T1.2.
 
 ### 3. Confirmation: threshold + temporal smoothing (FR-3 / NFR-3)
 
-- [ ] **T1.5** Tests: a run of N consecutive above-threshold verdicts confirms; a single
+- [x] **T1.5** Tests: a run of N consecutive above-threshold verdicts confirms; a single
   above-threshold frame surrounded by below-threshold does not; below-threshold frames
-  never confirm regardless of count.
-- [ ] **T1.6** Implement a pure (no-I/O) confirmation component holding the recent-verdict
-  window. Config: `RABBITWATCH_CONF_THRESHOLD` (default `0.8`),
-  `RABBITWATCH_CONSECUTIVE_FRAMES` (default `3`).
+  never confirm regardless of count. (`tests/test_confirmer.py`)
+- [x] **T1.6** Implement a pure (no-I/O) confirmation component holding the recent-verdict
+  window (`Confirmer` in `src/brain/detector.py`). Config: `RABBITWATCH_CONF_THRESHOLD`
+  (default `0.8`), `RABBITWATCH_CONSECUTIVE_FRAMES` (default `3`).
 
 ### 4. Event de-duplication: cooldown (FR-4 / NFR-3)
 
-- [ ] **T1.7** Tests: after a confirmed event, further confirmations within the cooldown
+- [x] **T1.7** Tests: after a confirmed event, further confirmations within the cooldown
   produce no new event; once the cooldown elapses, a new confirmation produces a new
-  event. Use an injectable clock (no real `sleep`).
-- [ ] **T1.8** Implement a cooldown gate. Config: `RABBITWATCH_COOLDOWN_SECONDS`
-  (default `300`).
+  event. Use an injectable clock (no real `sleep`). (`tests/test_cooldown.py`)
+- [x] **T1.8** Implement a cooldown gate (`Cooldown` in `src/brain/detector.py`). Config:
+  `RABBITWATCH_COOLDOWN_SECONDS` (default `300`).
 
 ### 5. Event log + snapshot (FR-5)
 
-- [ ] **T1.9** Tests: writing an event appends one machine-readable record (timestamp,
+- [x] **T1.9** Tests: writing an event appends one machine-readable record (timestamp,
   confidence, snapshot reference) and persists the snapshot; the log is re-readable and
-  parseable (round-trip).
-- [ ] **T1.10** Implement an append-only event log (JSON Lines at
+  parseable (round-trip). (`tests/test_events.py`)
+- [x] **T1.10** Implement an append-only event log (JSON Lines at
   `RABBITWATCH_EVENTS_LOG`, default `<RABBITWATCH_OUTPUT_DIR>/events.jsonl`) plus snapshot
-  write under the output dir.
+  write under the output dir (`src/brain/events.py`).
 
 ### 6. Wire into the brain loop (FR-1…FR-5 / NFR-2, NFR-4)
 
-- [ ] **T1.11** Integration test: feed the fake stream a scripted frame/verdict sequence
+- [x] **T1.11** Integration test: feed the fake stream a scripted frame/verdict sequence
   through the full chain (verdict → confirm → cooldown → event log) and assert the exact
   events written — including that an inference failure mid-sequence yields no false
-  event and processing continues.
-- [ ] **T1.12** Replace the save-every-frame stub in `src/brain/inference.py` with the
-  chain above. Preserve the existing freshness behavior (bounded buffer, block-and-batch
-  read).
-- [ ] **T1.13** Add the new `RABBITWATCH_*` vars to the env-var table in
-  [architecture.md](architecture.md); flip the relevant sub-system status markers here.
-- [ ] **T1.14** Manual smoke test against a real LM Studio endpoint (documented here, not
-  automated): confirm a real couch visit produces exactly one event + snapshot.
+  event and processing continues. (`tests/test_pipeline.py`)
+- [x] **T1.12** Replace the save-every-frame stub in `src/brain/inference.py` with the
+  chain above (`RabbitCouchDetector`). Preserves the block-and-batch read; the blocking
+  vision call runs via `asyncio.to_thread`.
+- [x] **T1.13** Add the new `RABBITWATCH_*` vars to the env-var table in
+  [architecture.md](architecture.md); flip the sub-system status markers here.
+- [ ] **T1.14** Real end-to-end smoke test.
+  - *Endpoint half* ✅: verified live — `VisionClient` classifies an image via
+    `172.27.144.1:1234` with Bearer auth and returns a parseable verdict (model
+    `google/gemma-4-e4b`).
+  - *Transport + real-frame inference* ✅: verified live — host producer → host Redis →
+    guest brain. Pulled a real 640×480 camera frame off the stream and Gemma 4 returned a
+    parseable verdict. (USB/IP rejected — see decisions.md.)
+  - *Positive observation* ⏳: with producer + brain both running, confirm an actual
+    rabbit-on-couch visit produces exactly one event + snapshot in
+    `data/brain/detections/`. This is the only piece left to watch happen for real.
 
 ---
 

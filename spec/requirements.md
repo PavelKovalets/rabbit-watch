@@ -42,3 +42,5 @@ Phase tags (P1–P4) map to the roadmap in [objectives.md](objectives.md).
   behind; dropping older unanalyzed frames is acceptable.
 - **NFR-5 — Testable offline**: Behavior is covered by automated tests that run without a
   camera, message buffer, or model endpoint available.
+- **NFR-6 — Secrets stay out of the repo**: Credentials (e.g. the inference endpoint API
+  token) are supplied via environment / a gitignored `.env` file and are never committed.

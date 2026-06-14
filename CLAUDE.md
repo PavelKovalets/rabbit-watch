@@ -29,14 +29,15 @@ Do not skip ahead: no implementation without a consolidated spec entry and a fai
 ## Commands
 
 ```bash
-docker-compose up -d                 # Start Redis (the only containerized service; inference is host-side LM Studio)
-pip install -r requirements.txt      # Install deps (use a venv)
-python -m src.producer.capture       # Run producer: webcam -> Redis Stream
-python -m src.brain.inference        # Run brain: Redis Stream -> consumer
-pytest                               # Run tests (no suite exists yet — create tests/ with the first SDD feature)
+docker-compose up -d                      # Start Redis (the only containerized service; inference is host-side LM Studio)
+conda env create -f environment.yml       # Create the `rabbit-watch` env (deps come from requirements.txt via pip)
+conda activate rabbit-watch               # ...then `pip install -r requirements.txt` to refresh after dep changes
+python -m src.producer.capture            # Run producer: webcam -> Redis Stream
+python -m src.brain.inference             # Run brain: Redis Stream -> detect rabbit-on-couch -> event log
+pytest                                    # Run the test suite (tests/, offline — no camera/Redis/LM Studio needed)
 ```
 
-Always run modules with `python -m src.<pkg>.<module>` from the repo root — imports are absolute from `src.`. (`pytest` is not yet in requirements.txt; add it when the first test lands.)
+Always run modules with `python -m src.<pkg>.<module>` from the repo root — imports are absolute from `src.`. Tests use injectable fakes for the vision client, clock, and frame stream, so the suite runs without any external services (NFR-5).
 
 ## Key constraints (details in spec/architecture.md)
 
