@@ -14,7 +14,11 @@ MAXLEN = int(os.getenv("RABBITWATCH_MAXLEN", "1000"))
 # Control whether captured frames are also written to disk for debugging.
 SAVE_FRAMES = os.getenv("RABBITWATCH_SAVE_FRAMES_TO_DISK", "False").lower() in ("1", "true", "yes")
 
-async def capture_loop(device_index: int = 0, fps: int = 10):
+async def capture_loop(device_index: int = 0, fps: float = None):
+    # Default capture rate matches the brain's inference throughput (~0.4 fps) so the
+    # stream isn't flooded with frames the model can never analyze.
+    if fps is None:
+        fps = float(os.getenv("RABBITWATCH_CAPTURE_FPS", "0.5"))
     r = get_redis_client()
     data_dir = None
     if SAVE_FRAMES:

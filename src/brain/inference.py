@@ -32,36 +32,43 @@ def _extract_jpeg(fields):
     return fields.get(b"jpeg") or fields.get("jpeg") or fields.get(b"jpg") or fields.get("jpg")
 
 
+# How often to poll for a new frame when none has arrived since the last one analyzed.
+POLL_INTERVAL = 0.5
+
+
 async def consumer_loop(detector: RabbitCouchDetector | None = None):
     detector = detector or build_detector()
     r = get_redis_client()
-    # "$" = only frames that arrive after we start; don't replay the buffered backlog
-    # on (re)start. Freshness over completeness (NFR-4).
-    last_id = "$"
-    logger.info("Starting inference consumer (rabbit-on-couch detection)")
+    last_seen = None
+    logger.info("Starting inference consumer (rabbit-on-couch detection; newest-frame)")
     while True:
         try:
-            # Block up to 5s for new frames; batches of 10.
-            entries = await r.xread({STREAM_KEY: last_id}, count=10, block=5000)
+            # Always analyze the *newest* frame and drop everything in between: inference
+            # is slower than capture, so chasing a backlog would just lag (NFR-4).
+            entries = await r.xrevrange(STREAM_KEY, count=1)
         except Exception:
             logger.exception("Redis read failed, retrying in 1s")
             await asyncio.sleep(1)
             continue
 
         if not entries:
+            await asyncio.sleep(POLL_INTERVAL)
             continue
 
-        for _stream, items in entries:
-            for entry_id, fields in items:
-                last_id = entry_id
-                jpeg = _extract_jpeg(fields)
-                if not jpeg:
-                    continue
-                try:
-                    # Vision call is blocking HTTP; keep it off the event loop.
-                    await asyncio.to_thread(detector.process, jpeg)
-                except Exception:
-                    logger.exception("Detector failed on frame %s", entry_id)
+        entry_id, fields = entries[0]
+        if entry_id == last_seen:
+            await asyncio.sleep(POLL_INTERVAL)  # no new frame since the last one analyzed
+            continue
+        last_seen = entry_id
+
+        jpeg = _extract_jpeg(fields)
+        if not jpeg:
+            continue
+        try:
+            # Vision call is blocking HTTP; keep it off the event loop.
+            await asyncio.to_thread(detector.process, jpeg)
+        except Exception:
+            logger.exception("Detector failed on frame %s", entry_id)
 
 
 if __name__ == "__main__":

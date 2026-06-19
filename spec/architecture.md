@@ -5,13 +5,16 @@
 Producer–consumer pipeline decoupled by a Redis Stream so the camera captures at full
 speed while inference consumes at its own pace:
 
-1. **Producer** (`src/producer/capture.py`) — OpenCV capture loop (default 10 fps),
-   JPEG-encodes frames (quality 80) and `XADD`s them to the stream with approximate
-   `MAXLEN` trimming (circular buffer in RAM, no disk I/O).
+1. **Producer** (`src/producer/capture.py`) — OpenCV capture loop at
+   `RABBITWATCH_CAPTURE_FPS` (default 0.5 fps — matched to the model's inference rate, so
+   the brain isn't drowned), JPEG-encodes frames (quality 80) and `XADD`s them to the
+   stream with approximate `MAXLEN` trimming (circular buffer in RAM, no disk I/O).
 2. **Redis Stream** — the buffer between processes. Stream key and trim length come
    from env vars (see below).
-3. **Brain** (`src/brain/inference.py`) — async `XREAD` consumer (blocks 5s, batches
-   of 10). Per frame it runs the detection chain: `vision.py` asks Gemma 4 (via
+3. **Brain** (`src/brain/inference.py`) — async consumer that analyzes the **newest**
+   frame each cycle and drops any backlog (freshness over completeness, NFR-4 — Gemma 4
+   inference (~2.5s) is slower than capture, so stale frames are skipped rather than
+   queued). Per analyzed frame it runs the detection chain: `vision.py` asks Gemma 4 (via
    LM Studio) whether the rabbit is on the couch and for a brief scene description;
    `detector.py` applies the confidence threshold + consecutive-frame smoothing
    (`Confirmer`). Phase 1 de-dups repeats with a cooldown (`Cooldown`); **Phase 2
@@ -64,6 +67,7 @@ network addressing, and assumed host state are documented in
 | `RABBITWATCH_REDIS` | `redis://localhost:6379` | common |
 | `RABBITWATCH_STREAM` | `rabbit-watch-frames` | producer, brain |
 | `RABBITWATCH_MAXLEN` | `1000` | producer |
+| `RABBITWATCH_CAPTURE_FPS` | `0.5` | producer (frames/sec; matched to model inference rate) |
 | `RABBITWATCH_SAVE_FRAMES_TO_DISK` | `False` | producer (debug: also write frames to `data/`) |
 | `RABBITWATCH_OUTPUT_DIR` | `data/brain/detections` | brain |
 | `RABBITWATCH_VLM_URL` | `http://localhost:1234/v1` | brain (set to host vSwitch IP inside the VM) |

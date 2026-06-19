@@ -5,6 +5,21 @@ decided, why, and what was rejected. Add an entry whenever a choice shapes the
 architecture, the toolchain, or the workflow — especially when reversing one of these
 means real rework.
 
+## 2026-06-19 — Match capture rate to inference; brain analyzes the newest frame
+
+**Decision**: The producer captures at `RABBITWATCH_CAPTURE_FPS` (default 0.5 fps, was a
+hardcoded 10), and the brain analyzes only the **newest** frame each cycle, dropping any
+backlog (NFR-4 freshness).
+
+**Why**: Gemma 4 inference takes ~2.5s/frame (~0.4 fps), but the camera was pushing ~5
+fps, so the brain analyzed only ~8% of frames and lagged minutes behind real time — short
+couch visits fell entirely in unanalyzed/evicted frames (a real visit was missed).
+Capturing near the model's rate (~one frame every 2s) gives near-full coverage, and
+always grabbing the latest frame keeps analysis current.
+
+**Rejected**: keeping 10 fps capture (wasteful; the model can't keep up); contiguous
+backlog reads (the cause of the lag).
+
 ## 2026-06-18 — Maximize capture by default: threshold 0.0, 1 consecutive frame
 
 **Decision**: Defaults now favour capturing everything: `RABBITWATCH_CONF_THRESHOLD` =

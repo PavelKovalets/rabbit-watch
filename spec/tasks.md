@@ -152,6 +152,11 @@ log.
 
 ### D. Follow-ups
 
+- [x] **T2.12** Fix throughput: make the producer capture rate configurable and lower its
+  default to ~0.5 fps (`RABBITWATCH_CAPTURE_FPS`), and have the brain analyze the newest
+  frame each cycle (drop backlog, NFR-4). Diagnosed live: ~2.5s/inference vs ~5 fps
+  capture → ~8% frame coverage and minutes of lag, so visits were missed.
+  (2026-06-19, see decisions.md)
 - [x] **T2.11** Lower the capture defaults so low-confidence / intermittent detections
   are still confirmed and their snapshots saved for review: `RABBITWATCH_CONF_THRESHOLD`
   → `0.0` and `RABBITWATCH_CONSECUTIVE_FRAMES` → `1` (both still configurable). Test: at
