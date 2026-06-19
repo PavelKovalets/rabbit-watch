@@ -57,6 +57,19 @@ def test_brief_absence_does_not_split_visit():
     assert visit.end == 3 and visit.duration_s == 3  # one visit, not split
 
 
+def test_defaults_capture_single_low_confidence_detection():
+    # Defaults (2026-06-18): threshold 0.0 + 1 consecutive frame -> any single on_couch
+    # frame, at any confidence, opens a visit.
+    from src.brain import detector
+
+    assert detector.DEFAULT_THRESHOLD == 0.0
+    assert detector.DEFAULT_CONSECUTIVE == 1
+    t = VisitTracker(absence_frames=1)  # threshold and consecutive use the defaults
+    assert t.observe(v(0.05), JPEG, 0) is None  # single low-confidence on_couch -> opens
+    visit = t.observe(absent(), JPEG, 1)
+    assert visit is not None and visit.confidence == 0.05
+
+
 def test_peak_confidence_scene_and_snapshot_captured():
     t = VisitTracker(threshold=0.8, consecutive=1, absence_frames=1)
     t.observe(Verdict(True, 0.85, "low", "r1"), b"first", 0)  # opens

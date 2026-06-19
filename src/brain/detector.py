@@ -17,8 +17,8 @@ from src.common.logger import get_logger
 
 logger = get_logger("brain.detector")
 
-DEFAULT_THRESHOLD = float(os.getenv("RABBITWATCH_CONF_THRESHOLD", "0.8"))
-DEFAULT_CONSECUTIVE = int(os.getenv("RABBITWATCH_CONSECUTIVE_FRAMES", "3"))
+DEFAULT_THRESHOLD = float(os.getenv("RABBITWATCH_CONF_THRESHOLD", "0.0"))
+DEFAULT_CONSECUTIVE = int(os.getenv("RABBITWATCH_CONSECUTIVE_FRAMES", "1"))
 DEFAULT_ABSENCE_FRAMES = int(os.getenv("RABBITWATCH_ABSENCE_FRAMES", "3"))
 
 

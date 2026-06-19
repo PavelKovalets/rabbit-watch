@@ -5,6 +5,27 @@ decided, why, and what was rejected. Add an entry whenever a choice shapes the
 architecture, the toolchain, or the workflow — especially when reversing one of these
 means real rework.
 
+## 2026-06-18 — Maximize capture by default: threshold 0.0, 1 consecutive frame
+
+**Decision**: Defaults now favour capturing everything: `RABBITWATCH_CONF_THRESHOLD` =
+`0.0` (was `0.8`) and `RABBITWATCH_CONSECUTIVE_FRAMES` = `1` (was `3`). Together, any
+single frame the model marks `on_couch` — at any confidence — opens a visit. Both stay
+configurable to tighten later.
+
+**Why**: A day's real run showed the model detecting rabbits but at low confidence, so
+nothing cleared the 0.8 bar — no visits were confirmed and no snapshots saved. While
+collecting data to understand the behavior, over-capturing and filtering later beats
+missing true positives. Confidence is still recorded per visit (and shown in the
+analytics workbook), so noise can be filtered after the fact.
+
+**Trade-off**: at these defaults there is no arrival smoothing (FR-3), so single-frame
+false positives become their own (often 0-duration) visits. Accepted for the
+data-collection phase; raise `RABBITWATCH_CONSECUTIVE_FRAMES` and/or
+`RABBITWATCH_CONF_THRESHOLD` once false positives are the bigger problem.
+
+**Rejected**: keeping `0.8` / `3` (missed real low-confidence, intermittent detections);
+removing the knobs entirely (kept configurable so they can be tightened later).
+
 ## 2026-06-13 — Phase 2 scope: richer events, dwell tracking, descriptive-only analytics
 
 **Decision**: Phase 2 (1) captures more per visit — a brief **scene description** and the

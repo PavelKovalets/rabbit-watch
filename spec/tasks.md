@@ -55,7 +55,8 @@ Test env: `conda env create -f environment.yml` → run with
   never confirm regardless of count. (`tests/test_confirmer.py`)
 - [x] **T1.6** Implement a pure (no-I/O) confirmation component holding the recent-verdict
   window (`Confirmer` in `src/brain/detector.py`). Config: `RABBITWATCH_CONF_THRESHOLD`
-  (default `0.8`), `RABBITWATCH_CONSECUTIVE_FRAMES` (default `3`).
+  (default `0.0`; lowered from `0.8` on 2026-06-18 — see T2.11/decisions),
+  `RABBITWATCH_CONSECUTIVE_FRAMES` (default `1`; lowered from `3` on 2026-06-18).
 
 ### 4. Event de-duplication: cooldown (FR-4 / NFR-3)
 
@@ -148,6 +149,14 @@ log.
   reproducibility) and write an `.xlsx` workbook via `openpyxl` — sheets for raw visits,
   per-day counts, time-of-day, and a summary (dwell stats). Add `openpyxl` to
   `requirements.txt` / `environment.yml`. No DB, no external services.
+
+### D. Follow-ups
+
+- [x] **T2.11** Lower the capture defaults so low-confidence / intermittent detections
+  are still confirmed and their snapshots saved for review: `RABBITWATCH_CONF_THRESHOLD`
+  → `0.0` and `RABBITWATCH_CONSECUTIVE_FRAMES` → `1` (both still configurable). Test: at
+  the defaults, a single low-confidence `on_couch` verdict opens a visit.
+  (2026-06-18, see decisions.md)
 
 ---
 

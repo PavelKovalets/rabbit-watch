@@ -70,8 +70,8 @@ network addressing, and assumed host state are documented in
 | `RABBITWATCH_VLM_MODEL` | `gemma-4` | brain (name as loaded in LM Studio) |
 | `RABBITWATCH_VLM_API_KEY` | _(unset)_ | brain (Bearer token; from env/.env, NFR-6) |
 | `RABBITWATCH_VLM_TIMEOUT` | `30` | brain (seconds) |
-| `RABBITWATCH_CONF_THRESHOLD` | `0.8` | brain (confidence to count a frame present) |
-| `RABBITWATCH_CONSECUTIVE_FRAMES` | `3` | brain (present frames to open a visit) |
+| `RABBITWATCH_CONF_THRESHOLD` | `0.0` | brain (min confidence to count a frame present; 0 = any on_couch detection) |
+| `RABBITWATCH_CONSECUTIVE_FRAMES` | `1` | brain (present frames to open a visit; 1 = open on first detection) |
 | `RABBITWATCH_ABSENCE_FRAMES` | `3` | brain (absent frames to close a visit) |
 | `RABBITWATCH_EVENTS_LOG` | `<RABBITWATCH_OUTPUT_DIR>/events.jsonl` | brain (per-visit log) |
 | `RABBITWATCH_RESPONSES_LOG` | `<RABBITWATCH_OUTPUT_DIR>/responses.jsonl` | brain (raw-response audit log) |
